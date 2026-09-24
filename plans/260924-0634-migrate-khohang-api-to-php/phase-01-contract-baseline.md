@@ -21,6 +21,16 @@ dependencies: []
 - Ghi nhận kiểm tra passkey `123456` ở `SettingsModal.tsx` là kiểm tra UI, còn route cập nhật/xóa kho trong `main.py` chỉ yêu cầu auth; không mô tả hành vi này là backend passkey enforcement.
 - Phân loại route cũ còn dùng và route chỉ còn trong wrapper legacy; không xóa vì tên có vẻ deprecated.
 
+## Trade-offs
+
+| Cách làm | Giả định chính | Thất bại đầu tiên khi |
+|---|---|---|
+| Laravel + Workerman tương thích frame cũ (đề xuất) | Có thể vận hành HTTP và WS PHP cùng dữ liệu, port trực tiếp giao thức hiện hữu | Môi trường đích không chạy được WS worker hoặc không thể chuyển event liên tiến trình |
+| Laravel + Reverb | Có thể đổi client/chat store sang Pusher protocol trong phạm vi dự án | Client cần giữ `/ws/rt` và frame `{type, reqId, data}` không đổi |
+| PHP thuần + thư viện nhỏ | Đội dự án sẵn sàng tự duy trì routing, validation, auth, migration và test | Số lượng hợp đồng 83 route/18 bảng làm lớp tự viết khó kiểm chứng |
+
+Better approaches: none — hướng đề xuất vẫn là backend PHP theo yêu cầu, với Laravel cho HTTP và Workerman giữ giao thức WS đang dùng bởi `rt_ws_client.ts`.
+
 ## Files / evidence
 
 - Read: [README](../../README.md), [FastAPI routes](../../KhoHang_API/app/main.py), [auth](../../KhoHang_API/app/auth_routes.py), [realtime HTTP](../../KhoHang_API/app/rt_chat_routes.py), [realtime WS](../../KhoHang_API/app/rt_chat_ws.py), [schemas](../../KhoHang_API/app/schemas.py), [DB](../../KhoHang_API/app/database.py), [client API](../../UI_Desktop/src/app/api_client.ts), [client WS](../../UI_Desktop/src/services/rt_ws_client.ts).

@@ -60,7 +60,7 @@ Laravel Reverb dùng giao thức Pusher nên sẽ đòi hỏi đổi client và 
 
 ## Nguồn
 
-- Mốc khảo sát: commit `7499d982e49b1b64c5848d568019c33a82467bbc` từ [repo gốc](https://github.com/siinn1706/NT106_QuanLyKho).
+- Mốc khảo sát: commit `7499d982e49b1b64c5848d568019c33a82467bbc` từ [repo gốc](https://github.com/siinn1706/NT106_QuanLyKho); [snapshot IS207](https://github.com/siinn1706/IS207) có lịch sử độc lập.
 - [Laravel 13 release notes](https://laravel.com/framework/docs/releases), [Laravel migrations](https://laravel.com/framework/docs/13.x/migrations), [Workerman requirements](https://manual.workerman.net/doc/en/install/requirement.html).
 
 ## Validation log
