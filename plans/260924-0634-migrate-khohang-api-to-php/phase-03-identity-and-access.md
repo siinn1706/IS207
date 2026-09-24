@@ -17,7 +17,7 @@ Port xác thực, người dùng và kiểm soát quyền mà không làm sai h�
 
 - Giữ các route `/auth/*`, `/users/*`, `/user/preferences`; Bearer JWT HS256 với `sub`/`exp`, bcrypt hash hiện có và các response/status trong ma trận phase 1.
 - OTP email có hash, hạn dùng, số lần thử và consumed state; SMTP là cổng tích hợp thật, không giả lập thành đã gửi thành công.
-- Giữ quy tắc role `admin/manager/staff`, quyền theo route thực tế; passkey dùng `X-Passkey` hoặc query legacy hiện có, tránh ghi passkey vào log. Quyết định thay query cần đổi hợp đồng riêng.
+- Giữ quy tắc role `admin/manager/staff` và quyền theo route thực tế. Các route cũ dùng `X-Passkey` hoặc query legacy vẫn cần được đối chiếu; riêng sửa/xóa kho phải yêu cầu người dùng đã xác thực và passkey hợp lệ trong header `X-Passkey` theo thay đổi đã chấp thuận. Không ghi passkey vào log hay URL mới.
 
 ## Files / architecture
 
@@ -28,12 +28,12 @@ Port xác thực, người dùng và kiểm soát quyền mà không làm sai h�
 
 1. Build explicit serializers, validation and token middleware matching legacy payloads, not Laravel's default session response shape. Test whether an unexpired legacy token can remain valid with the same secret; otherwise plan forced re-login and client handling.
 2. Port registration, login, password reset, passkey OTP, profile/avatar and preference flows. Verify existing bcrypt hashes without resetting passwords.
-3. Derive route-by-route authorization tests from phase 1, including unauthenticated and wrong-role cases. Do not infer enforcement from comments alone.
+3. Derive route-by-route authorization tests from phase 1, including unauthenticated and wrong-role cases. Tạo middleware/service xác minh passkey thật để phase 4 gắn vào `PUT`/`DELETE /warehouses/{warehouse_id}`; kiểm thử thiếu, sai và đúng passkey. Không suy quyền từ comment hoặc kiểm tra ở UI.
 4. Add rate limits for OTP/login and ensure secrets, JWT and query passkey never appear in application logs; preserve expected client error messages where relied on.
 
 ## Todo
 
-- [ ] Auth contract and RBAC matrix pass.
+- [ ] Auth contract, RBAC matrix và kiểm thử passkey phía server pass.
 - [ ] Legacy hashes, OTP state and JWT behavior pass on copied data.
 - [ ] SMTP delivery separately verified only when credentials are provided.
 

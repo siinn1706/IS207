@@ -15,7 +15,7 @@ Tạo backend PHP có schema tương thích và đường chuyển dữ liệu c
 
 ## Requirements
 
-- Dùng Laravel 13/PHP 8.3+ nếu phase 1 chấp nhận. Giữ root URL hiện có: Laravel `routes/api.php` có prefix mặc định `/api`, cần cấu hình rõ để không nhân đôi prefix như `/api/chatbot/*`.
+- Dùng Laravel 13/PHP 8.3+ theo quyết định đã chấp thuận. Giữ root URL hiện có: Laravel `routes/api.php` có prefix mặc định `/api`, cần cấu hình rõ để không nhân đôi prefix như `/api/chatbot/*`.
 - Giữ SQLite là baseline thực tế; `app/database.py` ép đường `data/data.db`, còn `app/config.py` và README nói có `DATABASE_URL`. PostgreSQL không thuộc migration này.
 - Giữ tên bảng, khóa kiểu chuỗi, FK, JSON, unique `(sender_id, client_message_id)`, time format và đường uploads. Không áp dụng migration trực tiếp lên DB nguồn.
 
