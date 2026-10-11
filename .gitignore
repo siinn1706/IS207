@@ -1,27 +1,43 @@
-# --- System & IDE Files ---
+# --- Hệ điều hành & IDE ---
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
+ehthumbs.db
+desktop.ini
 .vscode/
 .idea/
 *.log
 
 # --- Python (Backend: KhoHang_API) ---
-KhoHang_API/__pycache__/
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Virtual Environments
+# Môi trường ảo
 venv/
 .venv/
 env/
 
-# Environment Variables (RẤT QUAN TRỌNG - Chứa API Key)
+# --- Biến môi trường (RẤT QUAN TRỌNG - Chứa API Key) ---
 .env
-KhoHang_API/.env
-UI_Desktop/.env.production
-KhoHang_API/data/uploads/
+.env.*
+!.env.example
+
+# --- Dữ liệu runtime (CSDL SQLite + file upload) ---
+KhoHang_API/data/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
 
 # --- Node/Web (Frontend: UI_Desktop) ---
 node_modules/
@@ -32,32 +48,13 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Local env files
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
 # --- Tauri (Rust) ---
-# Build artifacts
-src-tauri/target/
 target/
 
-# Generated files
-src-tauri/gen/
+# --- Claude Code (cấu hình cá nhân) ---
+.claude/settings.local.json
 
-# --- Operating System ---
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-*.db
-*.db-wal
-*.db-shm
+# --- Markdown: chỉ theo dõi plans/ và docs/ (file khác cần git add -f) ---
 *.md
 !plans/**/*.md
 !docs/**/*.md
-*.sqlite
