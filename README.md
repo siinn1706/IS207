@@ -34,6 +34,13 @@
 | 3 | **Nguyễn Võ Minh Trí** | 24521840 | Backend Dev |
 | 4 | **Nguyễn Văn Nam** | 24521120 | Fullstack |
 
+## 🔴 Nhóm phát triển (IS207 - UIT)
+| STT | Họ và tên | MSSV | Vai trò |
+|:---:|:---:|:---:|:---|
+| 1 | **Hoàng Xuân Minh Trí** | 24521829 | Fullstack / Leader |
+| 2 | **Lê Hoàng Việt** | 23521778 | Backend Dev |
+| 3 | **Nguyễn Văn Nam** | 24521120 | Fullstack |
+
 ## ✨ Tính năng chính
 
 ### 📦 Quản lý hàng hóa
