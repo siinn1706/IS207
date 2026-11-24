@@ -2,6 +2,7 @@
 # UI smoke test: PHP backend (8000/8001) on a synthetic DB + Vite (5173), then
 # Playwright logs in, visits every page and runs the key flows (smoke.js).
 # Never touches KhoHang_API/data.   PY=/path/to/python ./run.sh [workdir]
+# Desktop app instead of Vite:      TAURI_EXE=/path/to/app.exe PY=... ./run.sh [workdir]
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; PHPDIR="$(cd "$HERE/../.." && pwd)"; ROOT="$(cd "$PHPDIR/../.." && pwd)"
 PY="${PY:-python3}"; WORK="${1:-$(mktemp -d)}"
@@ -16,7 +17,16 @@ pids=(); cleanup() { for p in "${pids[@]}"; do
 (cd "$PHPDIR" && exec php artisan rt:serve) >"$WORK/rt.log" 2>&1 & pids+=($!)
 (cd "$PHPDIR/public" && PHP_CLI_SERVER_WORKERS=4 exec php -S 127.0.0.1:8000 \
    ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php) >"$WORK/http.log" 2>&1 & pids+=($!)
-(cd "$ROOT/UI_Desktop" && exec npx vite --port 5173 --host 127.0.0.1 --strictPort) >"$WORK/vite.log" 2>&1 & pids+=($!)
-for u in http://127.0.0.1:8000/ http://127.0.0.1:5173/; do for _ in $(seq 120); do curl -sf "$u" >/dev/null && break; sleep 0.5; done; done
-"$PY" "$HERE/seed_api.py" >/dev/null
-node "$HERE/smoke.js" "$WORK/shots"
+wait_url() { for _ in $(seq 120); do curl -sf "$1" >/dev/null && return; sleep 0.5; done; }
+if [ -n "${TAURI_EXE:-}" ]; then
+  # Desktop build (Windows): drive the app's WebView2 window through its DevTools port.
+  wait_url http://127.0.0.1:8000/; "$PY" "$HERE/seed_api.py" >/dev/null
+  WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222 "$TAURI_EXE" >"$WORK/tauri.log" 2>&1 & pids+=($!)
+  wait_url http://127.0.0.1:9222/json/version
+  CDP_URL=http://127.0.0.1:9222 APP_URL="${TAURI_URL:-http://tauri.localhost}" node "$HERE/smoke.js" "$WORK/shots"
+else
+  (cd "$ROOT/UI_Desktop" && exec npx vite --port 5173 --host 127.0.0.1 --strictPort) >"$WORK/vite.log" 2>&1 & pids+=($!)
+  wait_url http://127.0.0.1:8000/; wait_url http://127.0.0.1:5173/
+  "$PY" "$HERE/seed_api.py" >/dev/null
+  node "$HERE/smoke.js" "$WORK/shots"
+fi

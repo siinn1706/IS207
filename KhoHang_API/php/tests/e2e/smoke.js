@@ -1,11 +1,12 @@
 // Requires Playwright (npm i -g playwright or NODE_PATH pointing to it) and a running stack (run.sh).
 const { chromium } = require('playwright');
-const APP = 'http://127.0.0.1:5173';
+// APP_URL/CDP_URL: drive an already running window (the Tauri app's WebView2) instead of launching Chromium.
+const APP = process.env.APP_URL || 'http://127.0.0.1:5173';
 (async () => {
   const out = process.argv[2] || '.';
   const problems = [], checks = [];
-  const b = await chromium.launch();
-  const page = await b.newPage({ viewport: { width: 1400, height: 900 } });
+  const b = process.env.CDP_URL ? await chromium.connectOverCDP(process.env.CDP_URL) : await chromium.launch();
+  const page = process.env.CDP_URL ? b.contexts()[0].pages()[0] : await b.newPage({ viewport: { width: 1400, height: 900 } });
   page.on('pageerror', e => problems.push(`pageerror ${page.url()}: ${e.message}`));
   let provoking = false; // console errors are expected while we provoke a failure on purpose
   page.on('console', m => { if (m.type() === 'error' && !provoking) problems.push(`console ${page.url()}: ${m.text().slice(0, 200)}`); });
@@ -17,14 +18,26 @@ const APP = 'http://127.0.0.1:5173';
   const check = (name, ok) => { checks.push(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) problems.push('check failed: ' + name); };
   // Wait until the page's API calls finish: a fixed delay aborts in-flight requests on slower
   // single-threaded servers (php -S on Windows) and shows up as bogus 'Failed to fetch' errors.
-  const open = async (url) => { await page.goto(url); await page.waitForLoadState('networkidle'); };
+  // networkidle is not enough: in-app navigation (login -> dashboard) does not reset it.
+  let inflight = 0;
+  const isApi = r => r.url().includes(':8000');
+  page.on('request', r => { if (isApi(r)) inflight++; });
+  for (const ev of ['requestfinished', 'requestfailed']) page.on(ev, r => { if (isApi(r)) inflight--; });
+  const settle = async () => {
+    for (let quiet = 0, waited = 0; quiet < 1000 && waited < 30000; waited += 100) {
+      await page.waitForTimeout(100); quiet = inflight > 0 ? 0 : quiet + 100;
+    }
+  };
+  const open = async (url) => { await settle(); await page.goto(url); await settle(); };
 
-  await page.goto(APP + '/login');
+  await open(APP + '/login');
+  await page.evaluate(() => localStorage.clear()); // the desktop app keeps its profile between runs
+  await page.reload(); await settle();
   await page.fill('input[placeholder*="username"]', 'admin');
   await page.fill('input[type="password"]', 'admin123');
   await page.keyboard.press('Enter');
   await page.waitForURL('**/dashboard', { timeout: 15000 });
-  await page.waitForLoadState('networkidle');
+  await settle();
   check('login reaches dashboard', true);
 
   for (const p of ['/dashboard', '/items', '/items/tracking', '/items/alerts', '/stock', '/stock/in', '/stock/out', '/suppliers', '/warehouses', '/reports']) {
