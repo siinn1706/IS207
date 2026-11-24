@@ -17,7 +17,10 @@ cp "$WORK/py/data/data.db" "$WORK/php/data.db"
 cp -r "$API/app" "$API/templates" "$WORK/py/"   # FastAPI resolves data/ next to its package
 
 pids=()
-cleanup() { for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done; }
+cleanup() { for p in "${pids[@]}"; do
+  # Git Bash: kill only stops the MSYS wrapper, so stop the whole Windows process tree.
+  if [ -r "/proc/$p/winpid" ]; then taskkill //PID "$(cat "/proc/$p/winpid")" //T //F >/dev/null 2>&1 || true; fi
+  kill "$p" 2>/dev/null || true; done; }
 trap cleanup EXIT
 
 (cd "$WORK/py" && exec "$PY" -m uvicorn app.main:app --port 9100 --log-level warning) >"$WORK/py.log" 2>&1 & pids+=($!)
