@@ -37,6 +37,42 @@ class InventoryAndFixesTest extends TestCase
             $this->h)->assertCreated()->json('id');
     }
 
+    private function stockOut(array $qtys): array
+    {
+        $id = $this->postJson('/stock/out', ['warehouse_code' => 'K1', 'recipient' => 'KH', 'purpose' => 'Nội bộ', 'date' => '2026-03-02',
+            'items' => array_map(fn ($q) => ['item_id' => '1', 'item_code' => 'A4', 'item_name' => 'Giấy', 'quantity' => $q, 'unit' => 'ram'], $qtys)],
+            $this->h)->assertCreated()->json('id');
+
+        return array_column(Legacy::json(DB::table('stock_out_records')->find($id)->items), 'cost');
+    }
+
+    public function test_fifo_consumes_earlier_layers(): void
+    {
+        $this->stockIn(10, 100);
+        $this->stockIn(10, 150);
+        $this->assertEquals([100.0], $this->stockOut([5]));          // 5 of layer 1
+        $this->assertEquals([125.0], $this->stockOut([10]));         // 5@100 + 5@150
+        $this->assertEquals([150.0], $this->stockOut([5]));          // rest of layer 2
+    }
+
+    public function test_fifo_counts_earlier_lines_of_same_voucher_and_ignores_cancelled(): void
+    {
+        $this->stockIn(4, 100);
+        $this->stockIn(10, 200);
+        $this->assertEquals([100.0, 200.0], $this->stockOut([4, 3]));
+        $id = DB::table('stock_out_records')->value('id');
+        $this->deleteJson("/stock/out/$id", [], $this->h + ['X-Passkey' => '246810'])->assertOk();
+        // the cancelled voucher no longer consumes layer 1
+        $this->assertEquals([100.0], $this->stockOut([4]));
+    }
+
+    public function test_fifo_falls_back_to_list_price_beyond_vouchers(): void
+    {
+        $this->stockIn(2, 100);
+        DB::table('items')->where('id', 1)->update(['quantity' => 10]); // stock added outside vouchers
+        $this->assertEquals([(2 * 100 + 2 * 999) / 4], $this->stockOut([4]));
+    }
+
     public function test_items_include_quantity(): void
     {
         $this->stockIn(7, 100);

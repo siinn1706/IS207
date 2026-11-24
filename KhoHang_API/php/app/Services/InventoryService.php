@@ -9,9 +9,8 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Port of inventory_service.py. Behaviour is kept 1:1, including the known
- * FIFO defect (calculate_fifo_cost ignores quantities already issued by earlier
- * stock-outs); fixing COGS is a separate, approved business change.
+ * Port of inventory_service.py. Behaviour is kept 1:1 except fifoCost(), which now
+ * accounts for units already issued (the FastAPI version did not).
  */
 class InventoryService
 {
@@ -131,28 +130,58 @@ class InventoryService
         return [$requested, null];
     }
 
-    /** Kept as-is from the FastAPI version (see class docblock). */
-    public static function fifoCost(int $itemId, string $warehouseCode, int $quantity): float
+    /**
+     * FIFO cost of issuing $quantity units of an item from a warehouse.
+     *
+     * Layers = lines of completed (non-cancelled) stock-in vouchers in creation order.
+     * Units already issued by completed stock-out vouchers (plus $alreadyTaken units
+     * earlier in the voucher being created) are consumed from the oldest layers first;
+     * the requested quantity is then priced from the remaining layers. Any shortfall
+     * (stock that never came through a voucher) is priced at the item's list price.
+     *
+     * The FastAPI version restarted from the oldest layer on every issue, so every
+     * stock-out was costed at the first purchase price (see contract-matrix.md).
+     */
+    public static function fifoCost(int $itemId, string $warehouseCode, int $quantity, int $alreadyTaken = 0): float
     {
-        $total = 0.0;
-        $remaining = $quantity;
+        $layers = [];
         $records = DB::table('stock_in_records')
             ->where('warehouse_code', $warehouseCode)->where('status', 'completed')
-            ->orderBy('created_at')->get();
+            ->orderBy('created_at')->orderBy('id')->get(['items']);
         foreach ($records as $record) {
+            foreach (Legacy::json($record->items) ?: [] as $it) {
+                if ((string) ($it['item_id'] ?? '') === (string) $itemId && (int) ($it['quantity'] ?? 0) > 0) {
+                    $layers[] = [(int) $it['quantity'], (float) ($it['price'] ?? 0)];
+                }
+            }
+        }
+
+        $consumed = $alreadyTaken;
+        $outs = DB::table('stock_out_records')
+            ->where('warehouse_code', $warehouseCode)->where('status', 'completed')->get(['items']);
+        foreach ($outs as $record) {
+            foreach (Legacy::json($record->items) ?: [] as $it) {
+                if ((string) ($it['item_id'] ?? '') === (string) $itemId) {
+                    $consumed += (int) ($it['quantity'] ?? 0);
+                }
+            }
+        }
+
+        $total = 0.0;
+        $remaining = $quantity;
+        foreach ($layers as [$qty, $price]) {
+            if ($consumed >= $qty) {
+                $consumed -= $qty;
+
+                continue;
+            }
+            $available = $qty - $consumed;
+            $consumed = 0;
+            $take = min($available, $remaining);
+            $total += $take * $price;
+            $remaining -= $take;
             if ($remaining <= 0) {
                 break;
-            }
-            foreach (Legacy::json($record->items) ?: [] as $it) {
-                if ($remaining <= 0) {
-                    break;
-                }
-                if ((string) ($it['item_id'] ?? '') !== (string) $itemId) {
-                    continue;
-                }
-                $take = min((int) ($it['quantity'] ?? 0), $remaining);
-                $total += $take * (float) ($it['price'] ?? 0);
-                $remaining -= $take;
             }
         }
         if ($remaining > 0) {
@@ -219,6 +248,7 @@ class InventoryService
         $record = DB::transaction(function () use ($data, $recordId, $user, $now) {
             $payload = [];
             $audit = [];
+            $taken = []; // units of each item already issued by earlier lines of this voucher
             foreach (self::sortItems($data['items']) as $it) {
                 $item = self::resolveItem($it['item_id'], $it['item_code']);
                 $available = (int) ($item->quantity ?: 0);
@@ -232,7 +262,8 @@ class InventoryService
                 if ($note) {
                     $audit[] = $note;
                 }
-                $fifo = self::fifoCost((int) $item->id, $data['warehouse_code'], $it['quantity']);
+                $fifo = self::fifoCost((int) $item->id, $data['warehouse_code'], $it['quantity'], $taken[$item->id] ?? 0);
+                $taken[$item->id] = ($taken[$item->id] ?? 0) + $it['quantity'];
                 $avg = $it['quantity'] > 0 ? $fifo / $it['quantity'] : 0;
                 $payload[] = self::payload($item, $it['quantity'], $it['unit'], $price, $avg);
                 DB::table('stock_transactions')->insert([

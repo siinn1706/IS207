@@ -34,7 +34,7 @@ Auth: `—` công khai · `JWT` Bearer bắt buộc · `JWT+PK` thêm passkey (`
 | Khác | `POST /stock/transactions` | JWT | |
 | AI | `POST /ai/chat`, `POST /ai/chat-md` | — | Gemini REST thay SDK; 501 khi thiếu key |
 | Phiếu | `GET /stock/in`, `GET /stock/in/{id}`, `GET /stock/out`, `GET /stock/out/{id}` | — | |
-| Phiếu | `POST /stock/in`, `POST /stock/out` | JWT | Mã phiếu `{kho}_PN|PX_{mmyy}_{0001}`, retry 5 lần khi trùng |
+| Phiếu | `POST /stock/in`, `POST /stock/out` | JWT | Giá vốn FIFO: khác biệt #17. Mã phiếu `{kho}_PN|PX_{mmyy}_{0001}`, retry 5 lần khi trùng |
 | Phiếu | `DELETE /stock/in/{id}`, `DELETE /stock/out/{id}` | JWT+PK | Huỷ = hoàn tồn + ghi giao dịch đảo |
 | Xuất tệp | `POST /export/excel`, `POST /export/pdf` | — | PhpSpreadsheet trên đúng template; PDF bằng Dompdf (font DejaVu, hỗ trợ tiếng Việt) |
 | Công ty | `GET /company`, `POST /company/upload-logo` | — | |
@@ -78,9 +78,9 @@ Quirk `reqId` của bản Python được giữ (client đang chạy với chún
 | 14 | `GET /warehouses/{id}/inventory` | Cộng cả phiếu đã huỷ | Bỏ phiếu đã huỷ | Sửa lỗi số liệu |
 | 15 | `POST /auth/change-password` | Không tồn tại (trang Đổi mật khẩu luôn 404) | Route mới: cần JWT, email phải của chính mình, kiểm mật khẩu cũ, rate limit | Hoàn thiện tính năng client đã có |
 | 16 | `POST /auth/logout` | Không tồn tại (client gọi khi đăng xuất, nhận 404) | Trả `{"message": "Logged out"}` (JWT không trạng thái) | |
+| 17 | Giá vốn FIFO (`cost` trong JSON phiếu xuất) | Mỗi lần xuất đều tính lại từ lô nhập **đầu tiên** → giá vốn sai từ lần xuất thứ hai | Bỏ qua lượng đã xuất bởi các phiếu xuất chưa huỷ (và các dòng trước trong cùng phiếu); phần vượt lô tính theo giá niêm yết | Thay đổi nghiệp vụ, nhánh riêng `claude/fifo-cogs`. Không có API/báo cáo nào đọc `cost` nên không đổi response; chỉ đổi dữ liệu lưu và ghi chú khi huỷ phiếu xuất |
 
 ## Hành vi giữ nguyên dù là lỗi
 
-- FIFO: `calculate_fifo_cost()` không trừ lượng đã xuất trước đó → giá vốn có thể sai. Port 1:1 theo quyết định.
 - `/rt/conversations/{id}/reject` với `delete_history` không xoá reactions/pin (FK không bật, như SQLAlchemy).
 - Nhiều route ghi (company, warehouses create, stock…) chỉ cần đăng nhập, không phân quyền theo role.

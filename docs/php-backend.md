@@ -63,13 +63,17 @@ php artisan test                         # DatabaseCompatibilityTest, AuthContra
 PY=/đường/dẫn/venv/bin/python tests/contract/run.sh   # so sánh với FastAPI (Linux/macOS, cần requirements.txt + websockets + uvicorn)
 ```
 
-`tests/e2e/run.sh` (cần Node + Playwright): dựng backend PHP trên DB tổng hợp + Vite, rồi Playwright đăng nhập qua UI thật, mở mọi trang, kiểm tra tồn kho hiển thị, báo cáo, sửa kho với passkey sai/đúng, đổi mật khẩu rồi đăng nhập lại. Lỗi console/HTTP ngoài dự kiến làm test fail.
+`tests/e2e/run.sh` (cần Node + Playwright): dựng backend PHP trên DB tổng hợp + Vite, rồi Playwright đăng nhập qua UI thật, mở mọi trang, kiểm tra tồn kho hiển thị, báo cáo, sửa kho với passkey sai/đúng, đổi mật khẩu rồi đăng nhập lại. Lỗi console/HTTP ngoài dự kiến làm test fail. Trước và sau mỗi lần chuyển trang, test đếm các request tới API đang chạy và chờ tới khi không còn request nào trong 1 giây, thay vì chờ một khoảng cố định. Lý do là trên Windows server PHP xử lý tuần tự, một trang cần vài giây mới tải xong, còn `networkidle` không áp dụng cho điều hướng nội bộ của SPA.
+
+Trên Windows, chạy `run.sh` bằng Git Bash, với `PY` trỏ tới Python có `passlib`, `bcrypt==4.0.1`, `requests` và `NODE_PATH` trỏ tới thư mục `node_modules` có gói `playwright` (kèm `npx playwright install chromium`). Khi kết thúc, script dừng cả cây tiến trình Windows (`taskkill /T`), nên Vite không còn chiếm cổng 5173.
+
+Chạy với bản desktop thay cho Vite: build bằng `npx tauri build --debug --no-bundle` trong `UI_Desktop` (cần Rust và Visual Studio Build Tools có C++), rồi đặt `TAURI_EXE` trỏ tới `src-tauri/target/debug/app.exe`. Script mở app với cổng debug WebView2 9222, rồi Playwright điều khiển chính cửa sổ app tại `http://tauri.localhost`. Test xoá `localStorage` trước khi đăng nhập, vì app giữ hồ sơ WebView2 giữa các lần chạy.
 
 `run.sh` không đụng tới `KhoHang_API/data`: nó tạo fixture tổng hợp, chạy hai backend trên hai bản sao và so sánh từng response, frame WebSocket và nội dung DB. Danh sách khác biệt được chấp nhận nằm trong `EXPECTED_DIFF` của `compare_backends.py` và trong [ma trận hợp đồng](../plans/260924-0634-migrate-khohang-api-to-php/contract-matrix.md).
 
 ## Chưa được kiểm chứng
 
 - Gửi mail OTP qua SMTP thật và gọi Gemini thật (cần credential).
-- Bản desktop Tauri (E2E mới chạy bản web qua Vite).
 - Dữ liệu vận hành thật (mới dùng fixture tổng hợp).
-- Chạy trên Windows (mới chạy trên Linux).
+
+Đã kiểm trên Windows 11 với PHP 8.3.37 NTS (bản winget `PHP.PHP.NTS.8.3`) và Composer 2.11 vào ngày 2026-11-24. Kết quả: PHPUnit 20/20; E2E 7/7, không có lỗi console hay HTTP; `php artisan serve` cùng `rt:serve` trả lời WebSocket `client:hello`, từ chối token sai và đẩy `inventory:updated` khi tạo phiếu nhập. `tests/contract/run.sh` trên Windows (Python 3.14 cài `requirements.txt` và `websockets`, đặt `PYTHONIOENCODING=utf-8`): 232 bước, 216 giống hệt, 16 khác biệt đã duyệt, 0 ngoài dự kiến; 18/18 bảng khớp; token FastAPI dùng được ở PHP và hash PHP được passlib xác minh. Bản desktop Tauri (build debug, MSVC 14.44) chạy E2E đạt 7/7, không có lỗi console hay HTTP. E2E bản web chạy 3 lần liên tiếp đều sạch.
