@@ -136,27 +136,44 @@ class AuthController
         if (! preg_match('/^[a-z0-9._-]{3,24}$/', $username)) {
             Http::fail(400, 'Username must be 3-24 characters, lowercase letters, numbers, dots, underscores, hyphens only');
         }
-        if (DB::table('users')->where('username', $username)->exists()) {
+        // An unverified account with the same email is a previous, unfinished attempt:
+        // let the person retry instead of locking the email forever.
+        $pending = DB::table('users')->where('email', $d['email'])->where('is_verified', false)->first();
+        $byName = DB::table('users')->where('username', $username)->first();
+        if ($byName && (! $pending || $byName->id !== $pending->id)) {
             Http::fail(400, 'Username already exists');
         }
-        if (DB::table('users')->where('email', $d['email'])->exists()) {
+        if (! $pending && DB::table('users')->where('email', $d['email'])->exists()) {
             Http::fail(400, 'Email already exists');
         }
         if (($wait = self::resendWait(self::validOtp($d['email'], 'register'))) !== null) {
             Http::fail(429, "Please wait $wait seconds before requesting a new OTP");
         }
-        $code = DB::transaction(function () use ($d, $username) {
+        [$code, $userId, $otpId] = DB::transaction(function () use ($d, $username, $pending) {
             $now = Legacy::now();
-            DB::table('users')->insert([
-                'id' => Legacy::uuid4(), 'username' => $username, 'email' => $d['email'],
-                'display_name' => $d['display_name'], 'avatar_url' => $d['avatar_url'],
-                'password_hash' => Passwords::hash($d['password']), 'role' => 'staff', 'is_verified' => false,
-                'created_at' => $now, 'updated_at' => $now,
-            ]);
+            $fields = [
+                'username' => $username, 'display_name' => $d['display_name'], 'avatar_url' => $d['avatar_url'],
+                'password_hash' => Passwords::hash($d['password']), 'updated_at' => $now,
+            ];
+            if ($pending) {
+                DB::table('users')->where('id', $pending->id)->update($fields);
+                $id = $pending->id;
+            } else {
+                $id = Legacy::uuid4();
+                DB::table('users')->insert($fields + [
+                    'id' => $id, 'email' => $d['email'], 'role' => 'staff', 'is_verified' => false, 'created_at' => $now,
+                ]);
+            }
+            $code = self::storeOtp($d['email'], 'register');
 
-            return self::storeOtp($d['email'], 'register');
+            return [$code, $id, DB::table('email_otps')->max('id')];
         });
         if (! OtpMailer::sendOtp($d['email'], $code, 'register')) {
+            // Undo this attempt so the same email/username can register again.
+            DB::table('email_otps')->where('id', $otpId)->delete();
+            if (! $pending) {
+                DB::table('users')->where('id', $userId)->where('is_verified', false)->delete();
+            }
             Http::fail(500, 'Failed to send OTP email');
         }
 
@@ -262,6 +279,39 @@ class AuthController
         DB::table('users')->where('id', $user->id)->update(['password_hash' => Passwords::hash($d['new_password']), 'updated_at' => Legacy::now()]);
 
         return Http::json(['message' => 'Password reset successfully']);
+    }
+
+    /**
+     * POST /auth/change-password {email, old_password, new_password}. New route for the
+     * existing client page. Requires the bearer token; email must be the caller's own.
+     */
+    public function changePassword(Request $r)
+    {
+        $cu = Auth::user($r);
+        [$d] = Validate::body($r, [
+            'email' => 'email', 'old_password' => 'str', 'new_password' => ['str', 'min' => 6, 'max' => 100],
+        ]);
+        self::throttle('change-password:'.$cu['id'], 5, 300);
+        $user = DB::table('users')->find($cu['id']);
+        if (! $user || strcasecmp($user->email, $d['email']) !== 0) {
+            Http::fail(400, 'Email không khớp với tài khoản đang đăng nhập');
+        }
+        if (! Passwords::verify($d['old_password'], $user->password_hash)) {
+            Http::fail(401, 'Mật khẩu cũ không đúng');
+        }
+        if ($d['old_password'] === $d['new_password']) {
+            Http::fail(400, 'Mật khẩu mới phải khác mật khẩu cũ');
+        }
+        DB::table('users')->where('id', $user->id)->update(['password_hash' => Passwords::hash($d['new_password']), 'updated_at' => Legacy::now()]);
+        RateLimiter::clear('change-password:'.$cu['id']);
+
+        return Http::json(['message' => 'Password changed successfully']);
+    }
+
+    /** Client calls this on sign-out. Tokens are stateless JWTs, so there is nothing to revoke. */
+    public function logout()
+    {
+        return Http::json(['message' => 'Logged out']);
     }
 
     // ---------- passkey ----------

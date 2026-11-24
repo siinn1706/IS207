@@ -3,11 +3,11 @@
 Nguồn chuẩn: `KhoHang_API/app/*.py` tại commit hiện tại của repo. Bản PHP: `KhoHang_API/php/routes/api.php`.
 Bằng chứng: `KhoHang_API/php/tests/contract/run.sh` chạy cùng một kịch bản (227 bước HTTP + WebSocket) trên FastAPI gốc và PHP, mỗi bên một bản sao của cùng fixture tổng hợp, rồi so status, header (`content-type`, `content-disposition`, `retry-after`), JSON (đã chuẩn hoá UUID/thời gian theo **dạng** chứ không bỏ qua) và nội dung 18 bảng sau khi chạy.
 
-Kết quả lần chạy gần nhất: **217 giống hệt, 10 khác biệt đã duyệt, 0 khác biệt ngoài dự kiến; 18/18 bảng giống nhau**; JWT do FastAPI cấp được PHP chấp nhận; hash bcrypt do PHP tạo được passlib xác minh.
+Kết quả lần chạy gần nhất: **232 bước — 216 giống hệt, 16 khác biệt đã duyệt (bảng dưới), 0 khác biệt ngoài dự kiến; 18/18 bảng giống nhau** (trừ bản ghi do lần đăng ký lỗi mail để lại ở FastAPI, xem #13); JWT do FastAPI cấp được PHP chấp nhận; hash bcrypt do PHP tạo được passlib xác minh. Ngoài ra `tests/e2e/run.sh` (Playwright) chạy UI thật: 7/7 luồng đạt.
 
-Giới hạn của bằng chứng: fixture tổng hợp, không phải dữ liệu vận hành; SMTP và Gemini **chưa** được gọi thật (chỉ kiểm nhánh "chưa cấu hình"); client React/Tauri chỉ được typecheck (`tsc`), chưa chạy end-to-end với backend PHP.
+Giới hạn của bằng chứng: fixture tổng hợp, không phải dữ liệu vận hành; SMTP và Gemini **chưa** được gọi thật (chỉ kiểm nhánh "chưa cấu hình"). Client đã chạy end-to-end ở chế độ web (Vite + Playwright, `tests/e2e/run.sh`), chưa chạy bản desktop Tauri.
 
-## Route HTTP (83 + static `/uploads`)
+## Route HTTP (83 của FastAPI + 2 route mới + static `/uploads`)
 
 Auth: `—` công khai · `JWT` Bearer bắt buộc · `JWT+PK` thêm passkey (`X-Passkey`, hoặc `?passkey=` kiểu cũ) · `JWT+PK*` chỉ header `X-Passkey` · `admin` JWT và role admin.
 
@@ -17,6 +17,8 @@ Auth: `—` công khai · `JWT` Bearer bắt buộc · `JWT+PK` thêm passkey (`
 | File | `GET /download/{folder}/{filename}`, `GET /uploads/{path}` | — | Chặn path traversal; folder whitelist như cũ |
 | Auth | `POST /auth/register/request-otp`, `/auth/register/confirm`, `/auth/login`, `/auth/password/request-otp`, `/auth/password/confirm` | — | Thêm rate limit: login 10 lần/phút/IP+tên, OTP 10 lần/10 phút/IP |
 | Auth | `GET /auth/me`, `POST /auth/passkey/request-otp`, `/auth/passkey/confirm` | JWT | |
+| Auth (mới) | `POST /auth/change-password` | JWT | Khác biệt #15; rate limit 5 lần/5 phút |
+| Auth (mới) | `POST /auth/logout` | — | Khác biệt #16 |
 | Users | `GET /users`, `GET/PATCH /users/me`, `POST/DELETE /users/me/avatar` | JWT | Avatar → WebP 800px (GD thay Pillow) |
 | Chatbot | `GET /api/chatbot/config` | — | Prefix `/api` giữ nguyên (Laravel cấu hình `apiPrefix: ''`) |
 | Chatbot | `PUT /api/chatbot/config` (query `bot_name`, `bot_description`), `POST /api/chatbot/avatar` | admin | |
@@ -70,12 +72,15 @@ Quirk `reqId` của bản Python được giữ (client đang chạy với chún
 | 8 | Lỗi ảnh hỏng khi upload avatar | Chuỗi Pillow kèm địa chỉ bộ nhớ | `Failed to process image: cannot identify image file` | |
 | 9 | Nội dung byte XLSX/PDF | openpyxl / ReportLab | PhpSpreadsheet / Dompdf | Header và tên file giống nhau; bố cục PDF tương đương, không giống từng byte |
 | 10 | WebSocket | Cùng cổng 8000 | Cổng 8001 | Quyết định Laravel + Workerman đã duyệt |
+| 11 | `Item` trả thêm `quantity` | pydantic bỏ mất trường này → trang Hàng hoá hiện " /5", lọc "tồn thấp" hỏng | Có `quantity` | Sửa lỗi hiển thị (thêm trường, không đổi trường cũ) |
+| 12 | `/chat/messages/*` | Mọi id bắt đầu `bot_` đều truy cập được → đọc/xoá lịch sử chatbot người khác | Chỉ đúng `bot_<id của mình>`, còn lại 403 | Lỗ hổng lộ dữ liệu; client vốn chỉ dùng id của mình |
+| 13 | Đăng ký khi gửi mail OTP lỗi | User chưa xác minh bị giữ lại → email bị khoá (`Email already exists`) | Huỷ bản ghi của lần thử; tài khoản chưa xác minh có thể yêu cầu lại | Sửa lỗi |
+| 14 | `GET /warehouses/{id}/inventory` | Cộng cả phiếu đã huỷ | Bỏ phiếu đã huỷ | Sửa lỗi số liệu |
+| 15 | `POST /auth/change-password` | Không tồn tại (trang Đổi mật khẩu luôn 404) | Route mới: cần JWT, email phải của chính mình, kiểm mật khẩu cũ, rate limit | Hoàn thiện tính năng client đã có |
+| 16 | `POST /auth/logout` | Không tồn tại (client gọi khi đăng xuất, nhận 404) | Trả `{"message": "Logged out"}` (JWT không trạng thái) | |
 
-## Hành vi giữ nguyên dù là lỗi (thay đổi riêng, chưa làm)
+## Hành vi giữ nguyên dù là lỗi
 
 - FIFO: `calculate_fifo_cost()` không trừ lượng đã xuất trước đó → giá vốn có thể sai. Port 1:1 theo quyết định.
-- `register/request-otp` tạo user chưa xác minh **trước** khi gửi mail; SMTP lỗi → 500 và email đó bị khoá đăng ký lại.
-- `/chat/messages/*` cho phép mọi `conversation_id` bắt đầu bằng `bot_` (không cô lập theo user).
-- `GET /warehouses/{id}/inventory` cộng cả phiếu đã huỷ.
 - `/rt/conversations/{id}/reject` với `delete_history` không xoá reactions/pin (FK không bật, như SQLAlchemy).
 - Nhiều route ghi (company, warehouses create, stock…) chỉ cần đăng nhập, không phân quyền theo role.

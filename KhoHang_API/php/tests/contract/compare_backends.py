@@ -52,6 +52,18 @@ def norm(v):
     return v
 
 
+def drop_additive(v):
+    """PHP adds Item.quantity (FastAPI's pydantic model silently dropped it). Ignore it."""
+    if isinstance(v, dict):
+        d = {k: drop_additive(x) for k, x in v.items()}
+        if {"sku", "category", "min_stock", "id", "quantity"} <= d.keys() and "unit" in d:
+            d.pop("quantity")
+        return d
+    if isinstance(v, (list, tuple)):
+        return [drop_additive(x) for x in v]
+    return v
+
+
 def typed(v):
     """Attach JSON types so 1 vs 1.0 differences are caught."""
     if isinstance(v, dict):
@@ -77,6 +89,12 @@ EXPECTED_DIFF = {
     "item.delete": "fix: item with stock history -> 409 instead of IntegrityError 500 (item kept in both)",
     "item.delete.404": "consequence of item.delete (item still exists in both)",
     "warehouse.delete": "consequence of warehouse.delete.wrong_passkey (FastAPI already deleted it)",
+    "chat.other_user_bot": "fix: users can no longer read another user's chatbot history",
+    "GET /warehouses/1/inventory": "fix: cancelled vouchers no longer counted in warehouse inventory",
+    "auth.change_password": "new route for the existing /change-password page (FastAPI: 404)",
+    "register.retry_after_mail_failure": "fix: failed OTP mail no longer locks the email (FastAPI: 400 Email already exists)",
+    "auth.logout": "new no-op route the client already calls on sign-out (FastAPI: 404)",
+    "register.confirm.nootp": "consequence of register fix: PHP removed the OTP of the failed attempt",
     "files.bad_ext": "FastAPI lists allowed extensions in random set order",
     "rt.files.bad_ext": "FastAPI lists allowed extensions in random set order",
 }
@@ -149,6 +167,9 @@ def script(s: Session):
     yield "auth.me", c("GET", "/auth/me", who="admin")
     yield "users.me", c("GET", "/users/me", who="staff")
     yield "users.patch", c("PATCH", "/users/me", who="staff", json={"display_name": "Nhân viên A"})
+    yield "auth.change_password", c("POST", "/auth/change-password", who="staff", json={
+        "email": "staff@example.com", "old_password": "nope", "new_password": "abcdef"})
+    yield "auth.logout", c("POST", "/auth/logout", who="staff")
     yield "users.patch.422", c("PATCH", "/users/me", who="staff", json={"display_name": ""})
     yield "users.search", c("GET", "/users?search=ADMIN&limit=5", who="staff")
     yield "users.search.empty", c("GET", "/users", who="staff")
@@ -159,6 +180,9 @@ def script(s: Session):
         "username": "Bad Name!", "email": "new@example.com", "display_name": "x", "password": "secret1"})
     yield "register.bademail", c("POST", "/auth/register/request-otp", json={
         "username": "newbie", "email": "not-an-email", "display_name": "x", "password": "secret1"})
+    new_user = {"username": "newbie", "email": "new@example.com", "display_name": "N", "password": "secret1"}
+    yield "register.mail_fails", c("POST", "/auth/register/request-otp", json=new_user)
+    yield "register.retry_after_mail_failure", c("POST", "/auth/register/request-otp", json=new_user)
     yield "register.confirm.nootp", c("POST", "/auth/register/confirm", json={"email": "new@example.com", "otp": "123456"})
     yield "otp.reset.unknown", c("POST", "/auth/password/request-otp", json={"username_or_email": "ghost"})
     yield "otp.reset.first", c("POST", "/auth/password/request-otp", json={"username_or_email": "staff"})
@@ -277,15 +301,16 @@ def script(s: Session):
     yield "prefs.get", c("GET", "/user/preferences", who="staff")
     yield "prefs.put", c("PUT", "/user/preferences", who="staff", json={"accent_id": "red", "dark_mode_theme": {"gradient_id": "polar", "pattern_opacity": 0.2}})
     yield "prefs.put.422", c("PUT", "/user/preferences", who="staff", json={"light_mode_theme": {"pattern_size_px": "big"}})
-    yield "chat.create", c("POST", "/chat/messages", who="staff", json={"id": "m1", "conversation_id": "bot_x", "sender": "user", "text": "xin chào",
+    yield "chat.create", c("POST", "/chat/messages", who="staff", json={"id": "m1", "conversation_id": "bot_u-staff", "sender": "user", "text": "xin chào",
                            "reply_to": {"id": "m0", "text": "hi", "sender": "bot"}})
-    yield "chat.create.dup", c("POST", "/chat/messages", who="staff", json={"id": "m1", "conversation_id": "bot_x", "sender": "user", "text": "khác"})
+    yield "chat.create.dup", c("POST", "/chat/messages", who="staff", json={"id": "m1", "conversation_id": "bot_u-staff", "sender": "user", "text": "khác"})
     yield "chat.create.forbidden", c("POST", "/chat/messages", who="staff", json={"id": "m2", "conversation_id": "other", "sender": "user", "text": "x"})
     yield "chat.react", c("PUT", "/chat/messages/m1/reactions", who="staff", json={"reactions": ["👍", "❤️"]})
     yield "chat.react.404", c("PUT", "/chat/messages/zz/reactions", who="staff", json={})
-    yield "chat.get", c("GET", "/chat/messages/bot_x", who="staff")
-    yield "chat.clear", c("DELETE", "/chat/messages/bot_x", who="staff")
-    yield "chat.get.after_clear", c("GET", "/chat/messages/bot_x", who="staff")
+    yield "chat.get", c("GET", "/chat/messages/bot_u-staff", who="staff")
+    yield "chat.other_user_bot", c("GET", "/chat/messages/bot_u-staff", who="admin")
+    yield "chat.clear", c("DELETE", "/chat/messages/bot_u-staff", who="staff")
+    yield "chat.get.after_clear", c("GET", "/chat/messages/bot_u-staff", who="staff")
 
     # ---- chatbot ----
     yield "chatbot.put.forbidden", c("PUT", "/api/chatbot/config?bot_name=X", who="staff")
@@ -449,7 +474,7 @@ def main():
     unexpected, approved, same = [], [], 0
     for (name, pv), (name2, hv) in zip(py, php):
         assert name == name2
-        np_, nh = typed(norm(pv)), typed(norm(hv))
+        np_, nh = typed(norm(pv)), typed(norm(drop_additive(hv)))
         if np_ == nh:
             same += 1
         elif name in EXPECTED_DIFF:

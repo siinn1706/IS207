@@ -13,6 +13,10 @@ TS = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{
 HEX32 = re.compile(r"(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])")
 SKIP_COLS = {"password_hash", "passkey_hash", "code_hash"}
 SKIP_TABLES = {"migrations", "sqlite_sequence"}
+# Approved difference: FastAPI keeps the unverified user + OTP of a registration whose
+# OTP mail failed; the PHP backend removes them so the email can register again.
+IGNORED_ROW_MARKERS = ['"new@example.com"']
+SKIP_TABLE_COLS = {("email_otps", "id")}  # autoincrement shifted by the removed row above
 
 
 def norm(v):
@@ -41,8 +45,8 @@ def dump(path):
             continue
         cur = con.execute(f"select * from {t}")
         cols = [c[0] for c in cur.description]
-        rows = [tuple(json.dumps(norm(v), ensure_ascii=False) for c, v in zip(cols, r) if c not in SKIP_COLS) for r in cur]
-        out[t] = sorted(rows)
+        rows = [tuple(json.dumps(norm(v), ensure_ascii=False) for c, v in zip(cols, r) if c not in SKIP_COLS and (t, c) not in SKIP_TABLE_COLS) for r in cur]
+        out[t] = sorted(r for r in rows if not any(m in r for m in IGNORED_ROW_MARKERS))
     return out
 
 
