@@ -282,7 +282,7 @@ Xuất 15x @ 200k
 → Lợi nhuận = (15×200k) - 1,750k = 1,250k ✓
 ```
 
-Tất cả báo cáo lợi nhuận đều dựa trên FIFO COGS chính xác.
+Mỗi phiếu xuất lưu giá vốn FIFO theo từng dòng hàng (trường `cost`): lượng đã xuất bởi các phiếu trước (chưa huỷ) được trừ khỏi các lô nhập cũ nhất trước khi tính. Hiện chưa có màn hình/báo cáo lợi nhuận nào đọc giá trị này.
 
 ## 🤝 Đóng góp
 - Fork dự án

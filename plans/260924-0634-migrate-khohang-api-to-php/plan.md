@@ -39,7 +39,7 @@ Laravel Reverb dùng giao thức Pusher nên sẽ đòi hỏi đổi client và 
 | 2 | [Nền Laravel và dữ liệu](./phase-02-database-and-laravel-foundation.md) | 1 | Done (fixture tổng hợp; dữ liệu thật: pending) |
 | 3 | [Danh tính và quyền truy cập](./phase-03-identity-and-access.md) | 2 | Done (SMTP thật: pending) |
 | 4 | [Danh mục và kho](./phase-04-catalog-and-warehouses.md) | 2, 3 | Done |
-| 5 | [Nhập xuất, FIFO và báo cáo](./phase-05-inventory-and-reports.md) | 2, 3, 4 | Done (FIFO giữ nguyên) |
+| 5 | [Nhập xuất, FIFO và báo cáo](./phase-05-inventory-and-reports.md) | 2, 3, 4 | Done (FIFO sửa ở nhánh riêng, khác biệt #17) |
 | 6 | [Xuất tệp, AI và chatbot](./phase-06-exports-and-ai.md) | 2, 3, 4 | Done (Gemini thật: pending) |
 | 7 | [Chat thời gian thực](./phase-07-realtime-chat.md) | 2, 3 | Done |
 | 8 | [Tích hợp client và chuyển đổi](./phase-08-client-cutover-and-verification.md) | 3-7 | Partial — launcher + client đã đổi; chưa chạy E2E React/Tauri, chưa thử trên Windows |
