@@ -42,7 +42,7 @@ Laravel Reverb dùng giao thức Pusher nên sẽ đòi hỏi đổi client và 
 | 5 | [Nhập xuất, FIFO và báo cáo](./phase-05-inventory-and-reports.md) | 2, 3, 4 | Done (FIFO sửa ở nhánh riêng, khác biệt #17) |
 | 6 | [Xuất tệp, AI và chatbot](./phase-06-exports-and-ai.md) | 2, 3, 4 | Done (Gemini thật: pending) |
 | 7 | [Chat thời gian thực](./phase-07-realtime-chat.md) | 2, 3 | Done |
-| 8 | [Tích hợp client và chuyển đổi](./phase-08-client-cutover-and-verification.md) | 3-7 | Partial — launcher + client đã đổi; chưa chạy E2E React/Tauri, chưa thử trên Windows |
+| 8 | [Tích hợp client và chuyển đổi](./phase-08-client-cutover-and-verification.md) | 3-7 | Partial — launcher + client đã đổi; E2E bản web đạt trên Linux và Windows; chưa chạy bản desktop Tauri |
 
 ## Dependencies
 
@@ -67,6 +67,7 @@ Laravel Reverb dùng giao thức Pusher nên sẽ đòi hỏi đổi client và 
 ## Validation log
 
 - Thực thi (2026-11-24): backend PHP ở `KhoHang_API/php/` (giữ tại đây thay vì dời vào `KhoHang_API/`, để bản FastAPI nằm nguyên chỗ làm đường rollback). `tests/contract/run.sh`: 227 bước HTTP+WS, 217 giống hệt, 10 khác biệt đã duyệt, 0 ngoài dự kiến; 18/18 bảng khớp; token FastAPI dùng được ở PHP; hash PHP được passlib xác minh. `php artisan test`: 11 test pass. Client `tsc` sạch. Chi tiết và giới hạn: [contract-matrix.md](./contract-matrix.md).
+- Windows (2026-11-24, Windows 11, PHP 8.3.37 NTS): PHPUnit 20/20; `tests/e2e/run.sh` 7/7 sạch, sau khi sửa test để chờ `networkidle` thay vì chờ cố định (server PHP trên Windows xử lý tuần tự nên request bị huỷ khi chuyển trang) và dừng cả cây tiến trình khi kết thúc; WebSocket qua `rt:serve` đạt hello, từ chối token sai, nhận `inventory:updated`. Chưa chạy bộ so sánh FastAPI trên Windows.
 
 - Đã xác nhận: repo mới tên `siinn1706/IS207`, `Public`, xuất bản dưới dạng snapshot đã dọn dữ liệu upload/thông tin admin mẫu; không đẩy lịch sử gốc.
 - Đã xác nhận: giữ FIFO hiện tại trong lần chuyển PHP; sửa giá vốn bằng thay đổi riêng.

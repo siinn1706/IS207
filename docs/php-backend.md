@@ -63,7 +63,9 @@ php artisan test                         # DatabaseCompatibilityTest, AuthContra
 PY=/đường/dẫn/venv/bin/python tests/contract/run.sh   # so sánh với FastAPI (Linux/macOS, cần requirements.txt + websockets + uvicorn)
 ```
 
-`tests/e2e/run.sh` (cần Node + Playwright): dựng backend PHP trên DB tổng hợp + Vite, rồi Playwright đăng nhập qua UI thật, mở mọi trang, kiểm tra tồn kho hiển thị, báo cáo, sửa kho với passkey sai/đúng, đổi mật khẩu rồi đăng nhập lại. Lỗi console/HTTP ngoài dự kiến làm test fail.
+`tests/e2e/run.sh` (cần Node + Playwright): dựng backend PHP trên DB tổng hợp + Vite, rồi Playwright đăng nhập qua UI thật, mở mọi trang, kiểm tra tồn kho hiển thị, báo cáo, sửa kho với passkey sai/đúng, đổi mật khẩu rồi đăng nhập lại. Lỗi console/HTTP ngoài dự kiến làm test fail. Mỗi trang được chờ tới khi hết request mạng (`networkidle`) chứ không chờ cố định, vì trên Windows server PHP xử lý tuần tự và một trang cần vài giây mới tải xong.
+
+Trên Windows, chạy `run.sh` bằng Git Bash, với `PY` trỏ tới Python có `passlib`, `bcrypt==4.0.1`, `requests` và `NODE_PATH` trỏ tới thư mục `node_modules` có gói `playwright` (kèm `npx playwright install chromium`). Khi kết thúc, script dừng cả cây tiến trình Windows (`taskkill /T`), nên Vite không còn chiếm cổng 5173.
 
 `run.sh` không đụng tới `KhoHang_API/data`: nó tạo fixture tổng hợp, chạy hai backend trên hai bản sao và so sánh từng response, frame WebSocket và nội dung DB. Danh sách khác biệt được chấp nhận nằm trong `EXPECTED_DIFF` của `compare_backends.py` và trong [ma trận hợp đồng](../plans/260924-0634-migrate-khohang-api-to-php/contract-matrix.md).
 
@@ -72,4 +74,5 @@ PY=/đường/dẫn/venv/bin/python tests/contract/run.sh   # so sánh với Fas
 - Gửi mail OTP qua SMTP thật và gọi Gemini thật (cần credential).
 - Bản desktop Tauri (E2E mới chạy bản web qua Vite).
 - Dữ liệu vận hành thật (mới dùng fixture tổng hợp).
-- Chạy trên Windows (mới chạy trên Linux).
+
+Đã kiểm trên Windows 11 với PHP 8.3.37 NTS (bản winget `PHP.PHP.NTS.8.3`) và Composer 2.11 vào ngày 2026-11-24. Kết quả: PHPUnit 20/20; E2E 7/7, không có lỗi console hay HTTP; `php artisan serve` cùng `rt:serve` trả lời WebSocket `client:hello`, từ chối token sai và đẩy `inventory:updated` khi tạo phiếu nhập. Chưa chạy `tests/contract/run.sh` trên Windows, vì bộ so sánh này cần dựng thêm backend FastAPI.

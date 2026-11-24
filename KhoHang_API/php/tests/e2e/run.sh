@@ -8,7 +8,10 @@ PY="${PY:-python3}"; WORK="${1:-$(mktemp -d)}"
 rm -rf "$WORK/data" "$WORK/shots"; mkdir -p "$WORK/data" "$WORK/shots"
 "$PY" "$PHPDIR/tests/contract/seed_fixture.py" "$WORK/data/data.db" >/dev/null
 export KHOHANG_DATA_DIR="$WORK/data" JWT_SECRET=e2e-secret CACHE_STORE=array APP_DEBUG=false
-pids=(); cleanup() { for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done; }; trap cleanup EXIT
+pids=(); cleanup() { for p in "${pids[@]}"; do
+  # Git Bash: kill only stops the MSYS wrapper, so stop the whole Windows process tree (npx -> node vite).
+  if [ -r "/proc/$p/winpid" ]; then taskkill //PID "$(cat "/proc/$p/winpid")" //T //F >/dev/null 2>&1 || true; fi
+  kill "$p" 2>/dev/null || true; done; }; trap cleanup EXIT
 (cd "$PHPDIR" && php artisan khohang:upgrade >/dev/null)
 (cd "$PHPDIR" && exec php artisan rt:serve) >"$WORK/rt.log" 2>&1 & pids+=($!)
 (cd "$PHPDIR/public" && PHP_CLI_SERVER_WORKERS=4 exec php -S 127.0.0.1:8000 \
