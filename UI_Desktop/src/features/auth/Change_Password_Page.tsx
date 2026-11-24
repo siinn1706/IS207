@@ -12,7 +12,7 @@ import Icon from '../../components/ui/Icon';
 
 export default function Change_Password_Page() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, token } = useAuthStore();
   
   // Form state
   const [email, setEmail] = useState(user?.email || '');
@@ -70,7 +70,10 @@ export default function Change_Password_Page() {
     try {
       const response = await fetch(`${BASE_URL}/auth/change-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           email,
           old_password: oldPassword,

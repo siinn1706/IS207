@@ -28,6 +28,8 @@ Route::post('/auth/login', [A::class, 'login']);
 Route::get('/auth/me', [A::class, 'me']);
 Route::post('/auth/password/request-otp', [A::class, 'passwordRequestOtp']);
 Route::post('/auth/password/confirm', [A::class, 'passwordConfirm']);
+Route::post('/auth/change-password', [A::class, 'changePassword']);
+Route::post('/auth/logout', [A::class, 'logout']);
 Route::post('/auth/passkey/request-otp', [A::class, 'passkeyRequestOtp']);
 Route::post('/auth/passkey/confirm', [A::class, 'passkeyConfirm']);
 

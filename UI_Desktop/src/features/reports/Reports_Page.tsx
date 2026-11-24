@@ -5,6 +5,9 @@ import { useThemeStore } from "../../theme/themeStore";
 import { BASE_URL } from "../../app/api_client";
 import Icon from "../../components/ui/Icon";
 
+/** /reports/inventory-by-category trả về giá trị tồn kho (số lượng × đơn giá), đơn vị VNĐ. */
+const formatVnd = (v: number) => `${Math.round(v).toLocaleString('vi-VN')}₫`;
+
 export default function Reports_Page() {
   const [selectedReport, setSelectedReport] = useState<string>("inventory");
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
@@ -180,7 +183,7 @@ export default function Reports_Page() {
                   <div key={item.category} className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="font-medium">{item.category}</span>
-                      <span className="font-bold">{item.value} sản phẩm</span>
+                      <span className="font-bold">{formatVnd(item.value)}</span>
                     </div>
                     <div className="h-8 rounded-full overflow-hidden bg-[var(--surface-2)]">
                       <div
@@ -202,9 +205,9 @@ export default function Reports_Page() {
                 <div className="font-semibold text-sm text-[var(--text-3)]">Tổng quan</div>
                 <div className="p-4 bg-[var(--surface-2)] border border-[var(--border)] rounded-[var(--radius-lg)] transition-all duration-[180ms] hover:scale-[1.02]">
                   <div className="text-3xl font-bold text-primary">
-                    {inventoryData.length > 0 ? inventoryData.reduce((acc, item) => acc + item.value, 0) : 0}
+                    {formatVnd(inventoryData.reduce((acc, item) => acc + item.value, 0))}
                   </div>
-                  <div className="text-sm text-[var(--text-3)]">Tổng hàng hoá</div>
+                  <div className="text-sm text-[var(--text-3)]">Tổng giá trị tồn kho</div>
                 </div>
                 <div className="p-4 bg-[var(--surface-2)] border border-[var(--border)] rounded-[var(--radius-lg)] transition-all duration-[180ms] hover:scale-[1.02]">
                   <div className="text-3xl font-bold text-success">
@@ -214,9 +217,9 @@ export default function Reports_Page() {
                 </div>
                 <div className="p-4 bg-[var(--surface-2)] border border-[var(--border)] rounded-[var(--radius-lg)] transition-all duration-[180ms] hover:scale-[1.02]">
                   <div className="text-3xl font-bold text-warning">
-                    {inventoryData.length > 0 ? Math.max(...inventoryData.map(d => d.value)) : 0}
+                    {formatVnd(inventoryData.length > 0 ? Math.max(...inventoryData.map(d => d.value)) : 0)}
                   </div>
-                  <div className="text-sm text-[var(--text-3)]">Danh mục lớn nhất</div>
+                  <div className="text-sm text-[var(--text-3)]">Giá trị danh mục lớn nhất</div>
                 </div>
               </div>
             </div>

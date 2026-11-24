@@ -63,11 +63,13 @@ php artisan test                         # DatabaseCompatibilityTest, AuthContra
 PY=/đường/dẫn/venv/bin/python tests/contract/run.sh   # so sánh với FastAPI (Linux/macOS, cần requirements.txt + websockets + uvicorn)
 ```
 
+`tests/e2e/run.sh` (cần Node + Playwright): dựng backend PHP trên DB tổng hợp + Vite, rồi Playwright đăng nhập qua UI thật, mở mọi trang, kiểm tra tồn kho hiển thị, báo cáo, sửa kho với passkey sai/đúng, đổi mật khẩu rồi đăng nhập lại. Lỗi console/HTTP ngoài dự kiến làm test fail.
+
 `run.sh` không đụng tới `KhoHang_API/data`: nó tạo fixture tổng hợp, chạy hai backend trên hai bản sao và so sánh từng response, frame WebSocket và nội dung DB. Danh sách khác biệt được chấp nhận nằm trong `EXPECTED_DIFF` của `compare_backends.py` và trong [ma trận hợp đồng](../plans/260924-0634-migrate-khohang-api-to-php/contract-matrix.md).
 
 ## Chưa được kiểm chứng
 
 - Gửi mail OTP qua SMTP thật và gọi Gemini thật (cần credential).
-- Chạy React/Tauri end-to-end với backend PHP (mới typecheck `tsc`).
+- Bản desktop Tauri (E2E mới chạy bản web qua Vite).
 - Dữ liệu vận hành thật (mới dùng fixture tổng hợp).
 - Chạy trên Windows (mới chạy trên Linux).

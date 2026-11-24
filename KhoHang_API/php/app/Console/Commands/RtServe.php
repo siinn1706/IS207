@@ -24,8 +24,8 @@ class RtServe extends Command
         if ($this->option('d')) {
             $argv[] = '-d';
         }
-        Worker::$pidFile = storage_path('framework/rt-server.pid');
-        Worker::$logFile = storage_path('logs/rt-server.log');
+        Worker::$pidFile = storage_path('framework/rt-server-'.config('khohang.ws_port').'.pid');
+        Worker::$logFile = storage_path('logs/rt-server-'.config('khohang.ws_port').'.log');
         $host = config('khohang.ws_host');
         $port = config('khohang.ws_port');
         $this->info("Realtime WebSocket: ws://$host:$port/ws/rt (internal bridge 127.0.0.1:".config('khohang.ws_internal_port').')');

@@ -359,7 +359,7 @@ class StockController
             'unit' => (string) $it['unit'], 'total_in' => 0, 'total_out' => 0, 'current_stock' => 0,
             'damaged' => 0, 'missing' => 0, 'min_stock' => $min, 'status' => 'normal',
         ];
-        foreach (DB::table('stock_in_records')->where('warehouse_code', $w->code)->get() as $rec) {
+        foreach (DB::table('stock_in_records')->where('warehouse_code', $w->code)->where('status', '!=', 'cancelled')->get() as $rec) {
             foreach (Legacy::json($rec->items) ?: [] as $it) {
                 $key = (string) $it['item_id'];
                 if (! isset($stats[$key])) {
@@ -369,7 +369,7 @@ class StockController
                 $stats[$key]['total_in'] += (int) $it['quantity'];
             }
         }
-        foreach (DB::table('stock_out_records')->where('warehouse_code', $w->code)->get() as $rec) {
+        foreach (DB::table('stock_out_records')->where('warehouse_code', $w->code)->where('status', '!=', 'cancelled')->get() as $rec) {
             foreach (Legacy::json($rec->items) ?: [] as $it) {
                 $key = (string) $it['item_id'];
                 $stats[$key] ??= $blank($it, 10);

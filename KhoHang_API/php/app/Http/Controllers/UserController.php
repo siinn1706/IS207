@@ -208,10 +208,13 @@ class UserController
 
     // ---------------- /chat/messages (chatbot history) ----------------
 
-    /** Legacy rule kept verbatim: own "bot_<id>" or any id starting with "bot_". */
+    /**
+     * Each user may only touch their own chatbot history "bot_<user id>".
+     * (FastAPI also accepted ANY id starting with "bot_", exposing other users' chats.)
+     */
     private static function guard(string $conversationId, array $user): void
     {
-        if ($conversationId !== 'bot_'.$user['id'] && ! str_starts_with($conversationId, 'bot_')) {
+        if ($conversationId !== 'bot_'.$user['id']) {
             Http::fail(403, 'Access denied to this conversation');
         }
     }

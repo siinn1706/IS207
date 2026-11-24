@@ -21,7 +21,10 @@ class Serializers
         ];
     }
 
-    /** schemas.Item has no `quantity` field: pydantic drops it from the response. */
+    /**
+     * schemas.Item had no `quantity`, so FastAPI silently dropped it even though the
+     * items pages display it. Added (additive change) so stock levels show up.
+     */
     public static function item(object $m): array
     {
         return [
@@ -33,6 +36,7 @@ class Serializers
             'supplier_id' => $m->supplier_id === null ? null : (int) $m->supplier_id,
             'min_stock' => (int) ($m->min_stock ?: 10),
             'id' => (int) $m->id,
+            'quantity' => (int) ($m->quantity ?? 0),
         ];
     }
 
