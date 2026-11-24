@@ -7,7 +7,7 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../state/auth_store';
-import { apiLogout } from '../../app/api_client';
+import { apiLogout, BASE_URL } from '../../app/api_client';
 import Icon from '../../components/ui/Icon';
 
 export default function Change_Password_Page() {
@@ -68,7 +68,7 @@ export default function Change_Password_Page() {
     setLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8000/auth/change-password', {
+      const response = await fetch(`${BASE_URL}/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

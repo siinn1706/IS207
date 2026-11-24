@@ -5,10 +5,10 @@
 # 📦 Ứng dụng Quản lý Nhập Xuất Kho
 ### NT106_QuanLyKho_Nhom12
 
-**IS207:** Bản chụp từ [NT106_QuanLyKho tại commit `7499d98`](https://github.com/siinn1706/NT106_QuanLyKho/commit/7499d982e49b1b64c5848d568019c33a82467bbc), đã bỏ dữ liệu upload và thông tin admin mẫu khỏi bản công khai. Backend hiện vẫn là FastAPI; [kế hoạch chuyển sang PHP](plans/260924-0634-migrate-khohang-api-to-php/plan.md) chưa được triển khai.
+**IS207:** Bản chụp từ [NT106_QuanLyKho tại commit `7499d98`](https://github.com/siinn1706/NT106_QuanLyKho/commit/7499d982e49b1b64c5848d568019c33a82467bbc), đã bỏ dữ liệu upload và thông tin admin mẫu khỏi bản công khai. Backend đã chuyển sang **PHP (Laravel 13 + Workerman)** theo [kế hoạch](plans/260924-0634-migrate-khohang-api-to-php/plan.md); xem [hướng dẫn backend PHP](docs/php-backend.md) và [ma trận hợp đồng](plans/260924-0634-migrate-khohang-api-to-php/contract-matrix.md). Bản FastAPI giữ lại để rollback.
 
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square&logo=opensourceinitiative&logoColor=white)](LICENSE)
-![Python](https://img.shields.io/badge/Backend-FastAPI_%7C_Python-3776AB?style=flat-square&logo=python&logoColor=white)
+![PHP](https://img.shields.io/badge/Backend-Laravel_%7C_PHP_8.3-777BB4?style=flat-square&logo=php&logoColor=white)
 ![React](https://img.shields.io/badge/Frontend-React_%7C_Tauri-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square)
 
@@ -19,7 +19,7 @@
 ---
 
 ## 🔸 Tóm tắt nhanh
-- **Hệ thống 2 thành phần**: Backend FastAPI + Frontend React/Tauri (Desktop + Web Dev Server)
+- **Hệ thống 2 thành phần**: Backend PHP (Laravel HTTP + Workerman WebSocket) + Frontend React/Tauri (Desktop + Web Dev Server)
 - **Xác thực**: JWT + OTP email, Passkey cho thao tác nguy hiểm, RBAC (Admin/Manager/Staff)
 - **Quản lý kho**: Sản phẩm, nhà cung cấp, nhiều kho; phiếu nhập/xuất, hủy phiếu, cập nhật tồn
 - **Báo cáo & FIFO**: COGS tự động bằng FIFO, lợi nhuận chính xác, Excel/PDF export
@@ -84,8 +84,9 @@
 ## 🏗️ Kiến trúc & thư mục
 ```tree
 NT106_QuanLyKho/
-├─ KhoHang_API/          # Backend FastAPI, SQLite/Postgres, AI client
-│  ├─ app/               # Mã nguồn chính (auth, inventory, export, chat...)
+├─ KhoHang_API/          # Backend: dữ liệu SQLite, uploads, template Excel
+│  ├─ php/               # Backend PHP (Laravel 13 + Workerman) - mặc định
+│  ├─ app/               # Backend FastAPI cũ (giữ để rollback)
 │  ├─ data/              # Thư mục dữ liệu, uploads (tự tạo nếu chưa có)
 │  └─ .env.example       # Cấu hình backend mẫu
 ├─ UI_Desktop/           # Frontend React + Tauri (desktop), Vite + Tailwind
@@ -93,7 +94,8 @@ NT106_QuanLyKho/
 │  ├─ src-tauri/         # Cấu hình Tauri/Rust
 │  └─ .env.example       # Cấu hình frontend mẫu
 ├─ start_app.bat         # Chạy backend + frontend cùng lúc (Windows)
-├─ start_backend.bat     # Chạy FastAPI dev server
+├─ start_backend.bat     # Chạy backend PHP (HTTP :8000 + WebSocket :8001)
+├─ start_backend_python.bat # Chạy FastAPI cũ (rollback)
 ├─ start_frontend.bat    # Chạy Tauri dev
 ├─ start_client1.bat     # Chạy web dev tại port 5173
 ├─ start_client2.bat     # Chạy web dev tại port 5174
@@ -101,21 +103,22 @@ NT106_QuanLyKho/
 ```
 
 ## 🛠️ Yêu cầu
-- Python 3.10+ (khuyến nghị 3.11), pip, venv
+- PHP 8.3+ (pdo_sqlite, gd có WebP, mbstring, zip, xml) và Composer
+- (Tuỳ chọn, chỉ để rollback/so sánh) Python 3.10+
 - Node.js 18+ và npm
 - Rust + Cargo (bắt buộc nếu chạy Tauri desktop)
 - SMTP (Gmail) cho OTP email; khóa Gemini API cho chatbot (tùy chọn)
-- SQLite mặc định; có thể chuyển Postgres qua `DATABASE_URL`
+- SQLite (`KhoHang_API/data/data.db`)
 
 ## 🔧 Cấu hình môi trường
 **Backend**: sao chép [KhoHang_API/.env.example](KhoHang_API/.env.example) thành `.env` và chỉnh:
 - `JWT_SECRET`, `JWT_ALGORITHM`, `JWT_EXP_DAYS`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`
-- `DATABASE_URL` (bỏ trống để dùng SQLite `data.db` mặc định)
 - `GEMINI_API_KEY` (tùy chọn, bật chatbot)
 
 **Frontend**: sao chép [UI_Desktop/.env.example](UI_Desktop/.env.example) thành `.env` và chỉnh:
 - `VITE_API_BASE_URL=http://localhost:8000` (hoặc URL deployment)
+- `VITE_WS_URL` (tuỳ chọn, mặc định cùng host, cổng 8001)
 
 ## 🚀 Chạy nhanh (Windows)
 
@@ -124,7 +127,7 @@ NT106_QuanLyKho/
 start_app.bat
 ```
 - Tự cài đặt dependencies
-- Khởi động Backend FastAPI (port 8000)
+- Khởi động Backend PHP (HTTP port 8000, WebSocket port 8001)
 - Khởi động Frontend Tauri Desktop
 
 ### 2️⃣ Chạy Backend & Frontend riêng biệt
@@ -150,7 +153,17 @@ start_client2.bat
 
 ## 🧩 Chạy thủ công (không dùng .bat)
 
-### Backend (FastAPI)
+### Backend (PHP)
+```bash
+cd KhoHang_API/php
+composer install
+cp .env.example .env && php artisan key:generate
+php artisan khohang:upgrade      # sao lưu rồi migrate nếu cần
+php artisan rt:serve             # WebSocket (cửa sổ riêng)
+php artisan serve --port=8000    # HTTP API
+```
+
+### Backend FastAPI (rollback)
 ```bash
 cd KhoHang_API
 
@@ -163,8 +176,7 @@ python -m venv .venv
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
-- API docs: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- API docs (chỉ bản FastAPI): http://localhost:8000/docs
 
 ### Frontend (React + Tauri)
 ```bash
@@ -189,7 +201,6 @@ cp .env.example .env
 # Chỉnh sửa:
 # - JWT_SECRET, JWT_ALGORITHM, JWT_EXP_DAYS
 # - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, FROM_EMAIL (OTP)
-# - DATABASE_URL (SQLite mặc định, hoặc Postgres)
 # - GEMINI_API_KEY (AI chatbot - optional)
 ```
 

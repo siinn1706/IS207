@@ -277,21 +277,17 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
     setShowPasskeyModal(true);
   };
   
-  const handlePasskeyConfirm = (passkey: string) => {
-    // TODO: Validate passkey với backend
-    // Giả sử passkey đúng là "123456" (sẽ thay bằng API call)
-    if (passkey !== '123456') {
-      showToast.info('Passkey không chính xác!');
-      setShowPasskeyModal(false);
-      return;
-    }
-    
-    // Thực hiện action tương ứng
-    if (passkeyAction === 'update' && pendingWarehouseId) {
-      updateWarehouse(pendingWarehouseId, warehouseForm);
-      resetWarehouseForm();
-    } else if (passkeyAction === 'delete' && pendingWarehouseId) {
-      deleteWarehouse(pendingWarehouseId);
+  const handlePasskeyConfirm = async (passkey: string) => {
+    // Passkey được backend xác minh (header X-Passkey); UI không tự so khớp mã.
+    try {
+      if (passkeyAction === 'update' && pendingWarehouseId) {
+        await updateWarehouse(pendingWarehouseId, warehouseForm, passkey);
+        resetWarehouseForm();
+      } else if (passkeyAction === 'delete' && pendingWarehouseId) {
+        await deleteWarehouse(pendingWarehouseId, passkey);
+      }
+    } catch (error: any) {
+      showToast.error(error?.message || 'Passkey không chính xác!');
     }
     
     // Reset states

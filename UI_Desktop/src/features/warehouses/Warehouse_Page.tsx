@@ -15,10 +15,11 @@ import {
 } from '../../app/api_client';
 import Icon from '../../components/ui/Icon';
 import Modal from '../../components/ui/Modal';
+import PasskeyModal from '../../components/ui/PasskeyModal';
 import { showSuccess, showError, showWarning } from '../../utils/toast';
 import { useAuthStore } from '../../state/auth_store';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { BASE_URL } from '../../app/api_client';
 
 interface UserSearchResult {
   id: number;
@@ -38,6 +39,28 @@ interface WarehouseForm {
 }
 
 export default function Warehouse_Page() {
+  // Sửa/xóa kho cần passkey thật (backend kiểm tra header X-Passkey).
+  const [passkeyRequest, setPasskeyRequest] = useState<{
+    title: string;
+    run: (passkey: string) => Promise<void>;
+  } | null>(null);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+
+  const requirePasskey = (title: string, run: (passkey: string) => Promise<void>) => {
+    setPasskeyRequest({ title, run });
+  };
+
+  const handlePasskeyConfirm = async (passkey: string) => {
+    if (!passkeyRequest) return;
+    setPasskeyLoading(true);
+    try {
+      await passkeyRequest.run(passkey);
+    } finally {
+      setPasskeyLoading(false);
+      setPasskeyRequest(null);
+    }
+  };
+
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -207,14 +230,25 @@ export default function Warehouse_Page() {
       return;
     }
     
+    if (editingWarehouse) {
+      requirePasskey('Xác thực để cập nhật kho', async (passkey) => {
+        try {
+          await apiUpdateWarehouse(editingWarehouse.id, formData, passkey);
+          showSuccess('Đã cập nhật kho thành công!');
+          setShowFormModal(false);
+          resetForm();
+          loadWarehouses();
+        } catch (error: any) {
+          console.error('Submit warehouse error:', error);
+          showError(error.message || 'Không thể lưu kho!');
+        }
+      });
+      return;
+    }
+
     try {
-      if (editingWarehouse) {
-        await apiUpdateWarehouse(editingWarehouse.id, formData);
-        showSuccess('Đã cập nhật kho thành công!');
-      } else {
-        await apiCreateWarehouse(formData as WarehouseCreate);
-        showSuccess('Đã thêm kho thành công!');
-      }
+      await apiCreateWarehouse(formData as WarehouseCreate);
+      showSuccess('Đã thêm kho thành công!');
       setShowFormModal(false);
       resetForm();
       loadWarehouses();
@@ -277,15 +311,17 @@ export default function Warehouse_Page() {
     
     if (!confirm(`Bạn có chắc muốn xóa ${managerEmail} khỏi danh sách quản lý?`)) return;
     
-    try {
-      const updatedManagers = selectedWarehouse.managers.filter(m => m.email !== managerEmail);
-      await apiUpdateWarehouse(selectedWarehouse.id, { managers: updatedManagers });
-      showSuccess('Đã xóa người quản lý thành công');
-      loadWarehouses();
-      setSelectedWarehouse({ ...selectedWarehouse, managers: updatedManagers });
-    } catch (error: any) {
-      showError(error.message || 'Không thể xóa người quản lý');
-    }
+    const updatedManagers = selectedWarehouse.managers.filter(m => m.email !== managerEmail);
+    requirePasskey('Xác thực để xóa người quản lý', async (passkey) => {
+      try {
+        await apiUpdateWarehouse(selectedWarehouse.id, { managers: updatedManagers }, passkey);
+        showSuccess('Đã xóa người quản lý thành công');
+        loadWarehouses();
+        setSelectedWarehouse({ ...selectedWarehouse, managers: updatedManagers });
+      } catch (error: any) {
+        showError(error.message || 'Không thể xóa người quản lý');
+      }
+    });
   };
   
   const handleChangeManagerPosition = async (managerEmail: string, newPosition: string) => {
@@ -299,28 +335,32 @@ export default function Warehouse_Page() {
       return;
     }
     
-    try {
-      const updatedManagers = selectedWarehouse.managers.map(m =>
-        m.email === managerEmail ? { ...m, position: newPosition } : m
-      );
-      await apiUpdateWarehouse(selectedWarehouse.id, { managers: updatedManagers });
-      showSuccess('Đã cập nhật chức vụ thành công');
-      loadWarehouses();
-      setSelectedWarehouse({ ...selectedWarehouse, managers: updatedManagers });
-    } catch (error: any) {
-      showError(error.message || 'Không thể cập nhật chức vụ');
-    }
+    const updatedManagers = selectedWarehouse.managers.map(m =>
+      m.email === managerEmail ? { ...m, position: newPosition } : m
+    );
+    requirePasskey('Xác thực để đổi chức vụ', async (passkey) => {
+      try {
+        await apiUpdateWarehouse(selectedWarehouse.id, { managers: updatedManagers }, passkey);
+        showSuccess('Đã cập nhật chức vụ thành công');
+        loadWarehouses();
+        setSelectedWarehouse({ ...selectedWarehouse, managers: updatedManagers });
+      } catch (error: any) {
+        showError(error.message || 'Không thể cập nhật chức vụ');
+      }
+    });
   };
   
   const handleDelete = async (id: number) => {
     if (!confirm('Bạn có chắc muốn xóa kho này?')) return;
-    try {
-      await apiDeleteWarehouse(id);
-      showSuccess('Đã xóa kho thành công!');
-      loadWarehouses();
-    } catch (error: any) {
-      showError(error.message || 'Không thể xóa kho!');
-    }
+    requirePasskey('Xác thực để xóa kho', async (passkey) => {
+      try {
+        await apiDeleteWarehouse(id, passkey);
+        showSuccess('Đã xóa kho thành công!');
+        loadWarehouses();
+      } catch (error: any) {
+        showError(error.message || 'Không thể xóa kho!');
+      }
+    });
   };
   
   const handleSetActive = async (id: number) => {
@@ -967,6 +1007,14 @@ export default function Warehouse_Page() {
           </div>
         )}
       </Modal>
+
+      <PasskeyModal
+        isOpen={passkeyRequest !== null}
+        onClose={() => setPasskeyRequest(null)}
+        onConfirm={handlePasskeyConfirm}
+        title={passkeyRequest?.title}
+        loading={passkeyLoading}
+      />
     </div>
   );
 }

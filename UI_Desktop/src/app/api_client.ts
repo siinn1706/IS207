@@ -789,9 +789,11 @@ export async function apiCreateWarehouse(data: WarehouseCreate): Promise<Warehou
   return res.json();
 }
 
-export async function apiUpdateWarehouse(id: number, data: WarehouseUpdate): Promise<Warehouse> {
+/** Sửa kho: backend xác minh passkey thật của người dùng qua header X-Passkey. */
+export async function apiUpdateWarehouse(id: number, data: WarehouseUpdate, passkey: string): Promise<Warehouse> {
   const res = await apiFetch(`${BASE_URL}/warehouses/${id}`, {
     method: 'PUT',
+    headers: { 'X-Passkey': passkey },
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -801,11 +803,16 @@ export async function apiUpdateWarehouse(id: number, data: WarehouseUpdate): Pro
   return res.json();
 }
 
-export async function apiDeleteWarehouse(id: number): Promise<void> {
+/** Xóa kho: backend xác minh passkey thật của người dùng qua header X-Passkey. */
+export async function apiDeleteWarehouse(id: number, passkey: string): Promise<void> {
   const res = await apiFetch(`${BASE_URL}/warehouses/${id}`, {
     method: 'DELETE',
+    headers: { 'X-Passkey': passkey },
   });
-  if (!res.ok) throw new Error("Không thể xóa kho");
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.detail || "Không thể xóa kho");
+  }
 }
 
 export async function apiSetActiveWarehouse(id: number): Promise<void> {
