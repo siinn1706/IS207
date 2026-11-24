@@ -6,7 +6,7 @@ echo.
 echo Starting Backend and Frontend...
 echo.
 
-start "Backend (FastAPI)" cmd /k "%~dp0start_backend.bat"
+start "Backend (PHP)" cmd /k "%~dp0start_backend.bat"
 
 timeout /t 3 /nobreak >nul
 

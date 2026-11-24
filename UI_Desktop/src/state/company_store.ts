@@ -63,8 +63,8 @@ interface CompanyStore {
   activeWarehouseId: string | null;
   loadWarehouses: () => Promise<void>;
   addWarehouse: (warehouse: Omit<Warehouse, 'id' | 'createdAt'>) => Promise<void>;
-  updateWarehouse: (id: string, data: Partial<Warehouse>) => Promise<void>;
-  deleteWarehouse: (id: string) => Promise<void>;
+  updateWarehouse: (id: string, data: Partial<Warehouse>, passkey: string) => Promise<void>;
+  deleteWarehouse: (id: string, passkey: string) => Promise<void>;
   setActiveWarehouse: (id: string) => Promise<void>;
   getActiveWarehouse: () => Warehouse | null;
   
@@ -224,7 +224,7 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
     }
   },
   
-  updateWarehouse: async (id, data) => {
+  updateWarehouse: async (id, data, passkey) => {
     try {
       set({ isLoading: true });
       const updated = await apiUpdateWarehouseAPI(parseInt(id), {
@@ -234,7 +234,7 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
         phone: data.phone,
         managers: data.managers,
         notes: data.notes,
-      });
+      }, passkey);
       
       const updatedWarehouse = convertAPIWarehouse(updated);
       set((state) => ({
@@ -250,10 +250,10 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
     }
   },
   
-  deleteWarehouse: async (id) => {
+  deleteWarehouse: async (id, passkey) => {
     try {
       set({ isLoading: true });
-      await apiDeleteWarehouseAPI(parseInt(id));
+      await apiDeleteWarehouseAPI(parseInt(id), passkey);
       
       set((state) => {
         const newWarehouses = state.warehouses.filter((wh) => wh.id !== id);

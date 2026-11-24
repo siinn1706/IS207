@@ -6,9 +6,22 @@
 
 import { useAuthStore } from '../state/auth_store';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+import { BASE_URL } from '../app/api_client';
 
-const WS_URL = BASE_URL.replace(/^http/, 'ws');
+/**
+ * Backend PHP chạy WebSocket (Workerman) ở tiến trình/cổng riêng (mặc định 8001),
+ * cùng host với HTTP API. Có thể ghi đè bằng VITE_WS_URL, ví dụ ws://server:8001.
+ */
+function resolveWsUrl(): string {
+  const explicit = import.meta.env.VITE_WS_URL;
+  if (explicit) return explicit.replace(/\/+$/, '');
+  const url = new URL(BASE_URL);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.port = import.meta.env.VITE_WS_PORT ?? '8001';
+  return url.origin;
+}
+
+const WS_URL = resolveWsUrl();
 
 type EventHandler = (data: any) => void;
 type EventType = 

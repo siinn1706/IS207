@@ -1,28 +1,31 @@
 @echo off
 echo ================================
-echo   Starting Backend (FastAPI)
+echo   Starting Backend (PHP / Laravel)
 echo ================================
 echo.
 
-cd /d "%~dp0\KhoHang_API"
+cd /d "%~dp0\KhoHang_API\php"
 
-if not exist .venv (
-    echo Virtual environment not found. Creating...
-    python -m venv .venv
-    echo.
+where php >nul 2>nul || (echo PHP 8.3+ is required: https://windows.php.net/download & pause & exit /b 1)
+where composer >nul 2>nul || (echo Composer is required: https://getcomposer.org/download/ & pause & exit /b 1)
+
+if not exist vendor (
+    echo Installing PHP dependencies...
+    call composer install --no-interaction
+)
+if not exist .env (
+    copy .env.example .env >nul
+    php artisan key:generate
 )
 
-echo Activating virtual environment...
-call .venv\Scripts\activate
+echo Checking database schema (backup is taken before any migration)...
+php artisan khohang:upgrade || (echo Schema upgrade failed - database left untouched. & pause & exit /b 1)
 
-echo Installing/Updating dependencies...
-pip install -r requirements.txt
-echo.
+echo Starting realtime chat server (WebSocket ws://localhost:8001/ws/rt)...
+start "KhoHang Realtime (WebSocket)" cmd /k php artisan rt:serve
 
-echo Starting FastAPI server...
-echo Server will run at: http://localhost:8000
-echo Docs available at: http://localhost:8000/docs
+echo Starting HTTP API at http://localhost:8000
 echo.
-uvicorn app.main:app --reload
+php artisan serve --host=127.0.0.1 --port=8000
 
 pause
